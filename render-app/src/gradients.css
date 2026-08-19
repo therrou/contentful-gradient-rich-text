@@ -1,0 +1,23 @@
+/* render-app/src/gradients.css */
+.gradient-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.gradient-text--gradient-sunset {
+  background: linear-gradient(135deg, #f97316, #ec4899);
+}
+
+.gradient-text--gradient-ocean {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+}
+
+.gradient-text--gradient-mint {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+}
+
+.gradient-text--gradient-berry {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+}
