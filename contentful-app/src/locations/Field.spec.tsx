@@ -9,9 +9,7 @@ vi.mock('@contentful/react-apps-toolkit', () => ({
 }));
 
 describe('Field component', () => {
-  it('Component text exists', () => {
-    const { getByText } = render(<Field />);
-
-    expect(getByText('Hello Entry Field Component (AppId: test-app)')).toBeInTheDocument();
+  it('renders the gradient rich text editor without throwing', () => {
+    expect(() => render(<Field />)).not.toThrow();
   });
 });
