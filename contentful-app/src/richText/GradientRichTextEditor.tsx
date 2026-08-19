@@ -1,13 +1,14 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { createEditor, type Descendant } from 'slate';
 import { Slate, Editable, withReact, type RenderLeafProps } from 'slate-react';
 import { withHistory } from 'slate-history';
 import type { FieldExtensionSDK } from '@contentful/app-sdk';
+import type { TopLevelBlock } from '@contentful/rich-text-types';
 import { IconButton } from '@contentful/f36-components';
 import { isGradientMarkType, type GradientMarkType } from '../gradientPresets';
 import { GradientLeaf } from './GradientLeaf';
 import { GradientToolbarButton } from './GradientToolbarButton';
-import { documentToSlateValue, slateValueToDocument } from './serialization';
+import { documentToSlateValue, slateValueToDocument, getNonParagraphBlocks } from './serialization';
 
 interface GradientRichTextEditorProps {
   sdk: FieldExtensionSDK;
@@ -18,13 +19,30 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
   const [value, setValue] = useState<Descendant[]>(() =>
     documentToSlateValue(sdk.field.getValue())
   );
+  // Non-paragraph top-level blocks (headings, lists, etc.) from the field's
+  // original document. This editor only edits paragraphs, so these are kept
+  // as-is and re-appended on every write-back instead of being silently
+  // dropped — see serialization.ts's slateValueToDocument doc comment.
+  const preservedBlocksRef = useRef<TopLevelBlock[]>(getNonParagraphBlocks(sdk.field.getValue()));
 
   const handleChange = useCallback(
     (newValue: Descendant[]) => {
       setValue(newValue);
-      sdk.field.setValue(slateValueToDocument(newValue));
+
+      // Slate fires onChange for selection-only moves (arrow keys, clicks)
+      // too. Skip those — writing back on every cursor move would dirty the
+      // entry and generate needless API traffic with no content change.
+      const isSelectionOnly = editor.operations.every((op) => op.type === 'set_selection');
+      if (isSelectionOnly) return;
+
+      sdk.field
+        .setValue(slateValueToDocument(newValue, preservedBlocksRef.current))
+        .catch((error: unknown) => {
+          // eslint-disable-next-line no-console
+          console.error('GradientRichTextEditor: failed to save field value', error);
+        });
     },
-    [sdk]
+    [sdk, editor]
   );
 
   const renderLeaf = useCallback((props: RenderLeafProps) => {
