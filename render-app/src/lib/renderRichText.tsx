@@ -14,6 +14,6 @@ const renderMark = Object.fromEntries(
   ])
 );
 
-export function renderGradientRichText(document: Document): JSX.Element {
+export function renderGradientRichText(document: Document): React.JSX.Element {
   return <>{documentToReactComponents(document, { renderMark })}</>;
 }
