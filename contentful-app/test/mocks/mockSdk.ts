@@ -14,6 +14,9 @@ const mockSdk: any = {
     getValue: vi.fn().mockReturnValue(undefined),
     setValue: vi.fn().mockResolvedValue(undefined),
   },
+  window: {
+    startAutoResizer: vi.fn(),
+  },
 };
 
 export { mockSdk };

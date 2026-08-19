@@ -3,12 +3,16 @@ import { createEditor, type Descendant } from 'slate';
 import { Slate, Editable, withReact, type RenderLeafProps } from 'slate-react';
 import { withHistory } from 'slate-history';
 import type { FieldExtensionSDK } from '@contentful/app-sdk';
-import type { TopLevelBlock } from '@contentful/rich-text-types';
 import { IconButton } from '@contentful/f36-components';
 import { isGradientMarkType, type GradientMarkType } from '../gradientPresets';
 import { GradientLeaf } from './GradientLeaf';
 import { GradientToolbarButton } from './GradientToolbarButton';
-import { documentToSlateValue, slateValueToDocument, getNonParagraphBlocks } from './serialization';
+import {
+  documentToSlateValue,
+  slateValueToDocument,
+  getBlockLayout,
+  type BlockLayoutEntry,
+} from './serialization';
 
 interface GradientRichTextEditorProps {
   sdk: FieldExtensionSDK;
@@ -19,11 +23,14 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
   const [value, setValue] = useState<Descendant[]>(() =>
     documentToSlateValue(sdk.field.getValue())
   );
-  // Non-paragraph top-level blocks (headings, lists, etc.) from the field's
-  // original document. This editor only edits paragraphs, so these are kept
-  // as-is and re-appended on every write-back instead of being silently
-  // dropped — see serialization.ts's slateValueToDocument doc comment.
-  const preservedBlocksRef = useRef<TopLevelBlock[]>(getNonParagraphBlocks(sdk.field.getValue()));
+
+  // Records the original document's top-level block order (which slots were
+  // paragraphs vs. non-paragraph blocks this editor doesn't render, e.g.
+  // headings/lists). This editor only edits paragraphs, so on write-back the
+  // regenerated paragraphs are merged back into their original positions
+  // instead of the preserved blocks being appended at the end — see
+  // serialization.ts's slateValueToDocument doc comment.
+  const layoutRef = useRef<BlockLayoutEntry[]>(getBlockLayout(sdk.field.getValue()));
 
   const handleChange = useCallback(
     (newValue: Descendant[]) => {
@@ -36,7 +43,7 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
       if (isSelectionOnly) return;
 
       sdk.field
-        .setValue(slateValueToDocument(newValue, preservedBlocksRef.current))
+        .setValue(slateValueToDocument(newValue, layoutRef.current))
         .catch((error: unknown) => {
           // eslint-disable-next-line no-console
           console.error('GradientRichTextEditor: failed to save field value', error);
@@ -50,6 +57,8 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
     const leafRecord = leaf as unknown as Record<string, unknown>;
     const gradientKey = Object.keys(leafRecord).find((key) => isGradientMarkType(key));
     let node = children;
+    if (leafRecord.bold) node = <strong>{node}</strong>;
+    if (leafRecord.italic) node = <em>{node}</em>;
     if (gradientKey) {
       return (
         <GradientLeaf
@@ -62,8 +71,6 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
         </GradientLeaf>
       );
     }
-    if (leafRecord.bold) node = <strong>{node}</strong>;
-    if (leafRecord.italic) node = <em>{node}</em>;
     return <span {...attributes}>{node}</span>;
   }, []);
 

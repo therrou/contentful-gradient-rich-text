@@ -5,6 +5,7 @@ import {
   documentToSlateValue,
   slateValueToDocument,
   getNonParagraphBlocks,
+  getBlockLayout,
 } from '../richText/serialization';
 
 describe('serialization', () => {
@@ -137,6 +138,93 @@ describe('serialization', () => {
       nodeType: BLOCKS.PARAGRAPH,
       data: {},
       content: [{ nodeType: 'text', value: 'editable paragraph', marks: [], data: {} }],
+    });
+  });
+
+  describe('getBlockLayout / position-preserving write-back', () => {
+    const heading = {
+      nodeType: BLOCKS.HEADING_1,
+      data: {},
+      content: [{ nodeType: 'text', value: 'Existing heading', marks: [], data: {} }],
+    };
+    const paragraph = {
+      nodeType: BLOCKS.PARAGRAPH,
+      data: {},
+      content: [{ nodeType: 'text', value: 'editable paragraph', marks: [], data: {} }],
+    };
+
+    it('preserves original order (heading before paragraph), not append-at-end', () => {
+      const doc: Document = {
+        nodeType: BLOCKS.DOCUMENT,
+        data: {},
+        content: [heading as any, paragraph as any],
+      };
+
+      const layout = getBlockLayout(doc);
+      expect(layout).toEqual([heading, 'paragraph']);
+
+      const slateValue = documentToSlateValue(doc);
+      const written = slateValueToDocument(slateValue, layout);
+
+      // Order-sensitive: heading must still come BEFORE the paragraph.
+      expect(written.content).toEqual([heading, paragraph]);
+    });
+
+    it('preserves order when the paragraph originally comes first', () => {
+      const doc: Document = {
+        nodeType: BLOCKS.DOCUMENT,
+        data: {},
+        content: [paragraph as any, heading as any],
+      };
+
+      const layout = getBlockLayout(doc);
+      const slateValue = documentToSlateValue(doc);
+      const written = slateValueToDocument(slateValue, layout);
+
+      expect(written.content).toEqual([paragraph, heading]);
+    });
+
+    it('inserts extra regenerated paragraphs right after the last paragraph slot', () => {
+      const doc: Document = {
+        nodeType: BLOCKS.DOCUMENT,
+        data: {},
+        content: [paragraph as any, heading as any],
+      };
+
+      const layout = getBlockLayout(doc);
+      const extraParagraph = {
+        type: 'paragraph',
+        children: [{ text: 'newly added paragraph' }],
+      };
+      const slateValue = [...documentToSlateValue(doc), extraParagraph] as any;
+
+      const written = slateValueToDocument(slateValue, layout);
+
+      expect(written.content).toEqual([
+        paragraph,
+        {
+          nodeType: BLOCKS.PARAGRAPH,
+          data: {},
+          content: [{ nodeType: 'text', value: 'newly added paragraph', marks: [], data: {} }],
+        },
+        heading,
+      ]);
+    });
+
+    it('omits unfilled paragraph slots when fewer paragraphs are regenerated', () => {
+      const doc: Document = {
+        nodeType: BLOCKS.DOCUMENT,
+        data: {},
+        content: [paragraph as any, heading as any, paragraph as any],
+      };
+
+      const layout = getBlockLayout(doc);
+      // Only one paragraph left in the editor (as if the second was deleted).
+      const slateValue = [{ type: 'paragraph', children: [{ text: 'editable paragraph' }] }] as any;
+
+      const written = slateValueToDocument(slateValue, layout);
+
+      expect(written.content).toEqual([paragraph, heading]);
     });
   });
 });

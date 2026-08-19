@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { createEditor } from 'slate';
 import { withReact } from 'slate-react';
 import { GradientToolbarButton } from '../richText/GradientToolbarButton';
-import * as gradientPlugin from '../richText/gradientPlugin';
+import * as gradientPlugin from '../richText/markToggle';
 
 describe('GradientToolbarButton', () => {
   it('renders one menu item per preset and applies the mark on click', () => {

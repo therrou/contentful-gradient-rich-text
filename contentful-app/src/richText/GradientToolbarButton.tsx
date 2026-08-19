@@ -2,7 +2,7 @@ import React from 'react';
 import type { Editor } from 'slate';
 import { Menu, IconButton } from '@contentful/f36-components';
 import { GRADIENT_PRESETS } from '../gradientPresets';
-import { toggleGradientMark } from './gradientPlugin';
+import { toggleGradientMark } from './markToggle';
 
 interface GradientToolbarButtonProps {
   editor: Editor;

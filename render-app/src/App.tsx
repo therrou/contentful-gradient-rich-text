@@ -19,8 +19,9 @@ export default function App() {
       return;
     }
 
-    getContentfulClient()
-      .getEntry(entryId)
+    Promise.resolve()
+      .then(() => getContentfulClient())
+      .then((client) => client.getEntry(entryId))
       .then((entry) => {
         const document = (entry.fields as Record<string, unknown>).richTextGradient as
           | Document

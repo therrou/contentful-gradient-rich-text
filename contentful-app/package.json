@@ -5,12 +5,8 @@
   "dependencies": {
     "@contentful/app-sdk": "^4.29.1",
     "@contentful/f36-components": "^4.81.1",
-    "@contentful/f36-icons": "^6.19.0",
     "@contentful/f36-tokens": "4.2.0",
-    "@contentful/field-editor-rich-text": "^6.4.1",
     "@contentful/react-apps-toolkit": "1.2.16",
-    "@udecode/plate-common": "^41.0.13",
-    "@udecode/plate-core": "^48.0.5",
     "contentful-management": "10.46.4",
     "emotion": "10.0.27",
     "react": "18.3.1",

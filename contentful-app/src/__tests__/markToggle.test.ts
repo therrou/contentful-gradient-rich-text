@@ -1,16 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createEditor, Editor, Transforms } from 'slate';
 import { withReact } from 'slate-react';
-import { createGradientPlugins, toggleGradientMark } from '../richText/gradientPlugin';
-import { GRADIENT_PRESETS } from '../gradientPresets';
-
-describe('createGradientPlugins', () => {
-  it('creates one plugin per preset keyed by markType', () => {
-    const plugins = createGradientPlugins();
-    expect(plugins.map((p) => p.key)).toEqual(GRADIENT_PRESETS.map((p) => p.markType));
-    expect(plugins.every((p) => p.isLeaf)).toBe(true);
-  });
-});
+import { toggleGradientMark } from '../richText/markToggle';
 
 describe('toggleGradientMark', () => {
   function buildEditorWithSelection() {

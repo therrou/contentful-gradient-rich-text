@@ -27,6 +27,23 @@ export function getNonParagraphBlocks(document: Document | undefined): TopLevelB
   return document.content.filter((block) => block.nodeType !== BLOCKS.PARAGRAPH);
 }
 
+/**
+ * A per-position record of the original document's top-level block order:
+ * either the literal string `'paragraph'` (an editable slot the Slate editor
+ * regenerates content for) or the original non-paragraph block itself
+ * (preserved unchanged). Passing this to `slateValueToDocument` lets it
+ * reconstruct blocks in their original positions instead of appending
+ * preserved blocks to the end on every write-back.
+ */
+export type BlockLayoutEntry = 'paragraph' | TopLevelBlock;
+
+export function getBlockLayout(document: Document | undefined): BlockLayoutEntry[] {
+  if (!document || !document.content) return [];
+  return document.content.map((block) =>
+    block.nodeType === BLOCKS.PARAGRAPH ? 'paragraph' : block
+  );
+}
+
 export function documentToSlateValue(document: Document | undefined): Descendant[] {
   if (!document || !document.content || document.content.length === 0) {
     return emptyParagraph();
@@ -53,16 +70,27 @@ export function documentToSlateValue(document: Document | undefined): Descendant
 /**
  * Converts the editor's Slate value back into a Contentful Document.
  *
- * `preservedBlocks` (typically obtained via `getNonParagraphBlocks` on the
- * original document before editing began) are non-paragraph top-level blocks
- * that this editor doesn't render or edit (headings, lists, quotes, etc. are
- * out of scope). They are appended unchanged so write-back never destroys
- * content this editor can't represent. Only paragraph blocks are
- * regenerated from the live Slate value.
+ * `layout` (typically obtained via `getBlockLayout` on the original document
+ * before editing began) records the original top-level block order: a
+ * `'paragraph'` entry marks an editable slot, and any other entry is a
+ * preserved non-paragraph block (heading, list, etc. — out of this editor's
+ * scope) to be re-emitted unchanged in its original position.
+ *
+ * Regenerated paragraphs (in Slate document order) are filled into
+ * `'paragraph'` slots in order. If the editor produced MORE paragraphs than
+ * there were original slots, the extras are inserted immediately after the
+ * last paragraph slot's position (or appended at the end if there were no
+ * paragraph slots at all — e.g. the field started out with only non-paragraph
+ * content). If the editor produced FEWER paragraphs than there were original
+ * slots (content deleted), the unfilled slots are simply omitted rather than
+ * emitting empty paragraphs.
+ *
+ * When `layout` is omitted (e.g. brand-new/empty field), all regenerated
+ * paragraphs are emitted in order with nothing preserved.
  */
 export function slateValueToDocument(
   value: Descendant[],
-  preservedBlocks: TopLevelBlock[] = []
+  layout: BlockLayoutEntry[] = []
 ): Document {
   const paragraphBlocks = value.map((node: any) => ({
     nodeType: BLOCKS.PARAGRAPH,
@@ -80,9 +108,35 @@ export function slateValueToDocument(
     }),
   })) as TopLevelBlock[];
 
-  return {
-    nodeType: BLOCKS.DOCUMENT,
-    data: {},
-    content: [...paragraphBlocks, ...preservedBlocks],
-  };
+  if (layout.length === 0) {
+    return { nodeType: BLOCKS.DOCUMENT, data: {}, content: paragraphBlocks };
+  }
+
+  const content: TopLevelBlock[] = [];
+  let pointer = 0;
+  let lastParagraphOutputIndex = -1;
+
+  for (const entry of layout) {
+    if (entry === 'paragraph') {
+      if (pointer < paragraphBlocks.length) {
+        content.push(paragraphBlocks[pointer]);
+        pointer += 1;
+        lastParagraphOutputIndex = content.length - 1;
+      }
+      // else: fewer regenerated paragraphs than original slots — skip.
+    } else {
+      content.push(entry);
+    }
+  }
+
+  if (pointer < paragraphBlocks.length) {
+    const extras = paragraphBlocks.slice(pointer);
+    if (lastParagraphOutputIndex === -1) {
+      content.push(...extras);
+    } else {
+      content.splice(lastParagraphOutputIndex + 1, 0, ...extras);
+    }
+  }
+
+  return { nodeType: BLOCKS.DOCUMENT, data: {}, content };
 }

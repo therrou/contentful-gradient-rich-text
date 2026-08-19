@@ -3,9 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BLOCKS } from '@contentful/rich-text-types';
 
 const getEntryMock = vi.fn();
+const getContentfulClientMock = vi.fn(() => ({ getEntry: getEntryMock }));
 
 vi.mock('../lib/contentfulClient', () => ({
-  getContentfulClient: () => ({ getEntry: getEntryMock }),
+  getContentfulClient: () => getContentfulClientMock(),
 }));
 
 import App from '../App';
@@ -29,6 +30,8 @@ describe('App', () => {
 
   beforeEach(() => {
     getEntryMock.mockReset();
+    getContentfulClientMock.mockReset();
+    getContentfulClientMock.mockImplementation(() => ({ getEntry: getEntryMock }));
     import.meta.env.VITE_CONTENTFUL_ENTRY_ID = 'entry-123';
   });
 
@@ -68,5 +71,14 @@ describe('App', () => {
     render(<App />);
     await waitFor(() => expect(screen.queryByRole('alert')).toBeTruthy());
     expect(screen.getByRole('alert').textContent).toContain('Missing VITE_CONTENTFUL_ENTRY_ID');
+  });
+
+  it('shows an error state (not a blank page) when getContentfulClient throws synchronously', async () => {
+    getContentfulClientMock.mockImplementation(() => {
+      throw new Error('Missing VITE_CONTENTFUL_SPACE_ID');
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toContain('Missing VITE_CONTENTFUL_SPACE_ID');
   });
 });
