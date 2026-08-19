@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "contentful-custom-app-from-scratch": {
+      "source": "contentful/skills",
+      "sourceType": "github",
+      "skillPath": "skills/contentful-apps/contentful-custom-app-from-scratch/SKILL.md",
+      "computedHash": "2300d9b6d4bb66b536ed78713344124e6e49b2edc9839ceb694bb62d95aeb0bc"
+    }
+  }
+}
