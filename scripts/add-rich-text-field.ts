@@ -17,14 +17,18 @@ async function main() {
 
   const client = contentfulManagement.createClient({
     accessToken: CONTENTFUL_MANAGEMENT_TOKEN,
-  }) as any;
+  });
 
-  const space = await client.getSpace(CONTENTFUL_SPACE_ID);
-  const environment = await space.getEnvironment(CONTENTFUL_ENVIRONMENT_ID);
-  const contentType = await environment.getContentType(CONTENTFUL_CONTENT_TYPE_ID);
+  const params = {
+    spaceId: CONTENTFUL_SPACE_ID,
+    environmentId: CONTENTFUL_ENVIRONMENT_ID,
+    contentTypeId: CONTENTFUL_CONTENT_TYPE_ID,
+  };
+
+  const contentType = await client.contentType.get(params);
 
   const fieldId = 'richTextGradient';
-  const alreadyExists = contentType.fields.some((f: any) => f.id === fieldId);
+  const alreadyExists = contentType.fields.some((f) => f.id === fieldId);
 
   if (alreadyExists) {
     console.log(`Field "${fieldId}" already exists on content type "${CONTENTFUL_CONTENT_TYPE_ID}". Skipping.`);
@@ -42,8 +46,8 @@ async function main() {
     validations: [],
   });
 
-  const updated = await contentType.update();
-  await updated.publish();
+  const updated = await client.contentType.update(params, contentType);
+  await client.contentType.publish(params, updated);
 
   console.log(`Added and published field "${fieldId}" on content type "${CONTENTFUL_CONTENT_TYPE_ID}".`);
 }
