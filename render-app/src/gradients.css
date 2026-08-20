@@ -6,18 +6,46 @@
   color: transparent;
 }
 
+/* background-image (not the `background` shorthand) — the shorthand resets
+   every background sub-property it doesn't mention, including
+   background-clip, back to its initial value (border-box). That silently
+   undid `.gradient-text`'s `background-clip: text` above and made the
+   gradient paint the full box instead of clipping to the letter shapes. */
 .gradient-text--gradient-sunset {
-  background: linear-gradient(135deg, #f97316, #ec4899);
+  background-image: linear-gradient(135deg, #f97316, #ec4899);
 }
 
 .gradient-text--gradient-ocean {
-  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  background-image: linear-gradient(135deg, #0ea5e9, #6366f1);
 }
 
 .gradient-text--gradient-mint {
-  background: linear-gradient(135deg, #10b981, #06b6d4);
+  background-image: linear-gradient(135deg, #10b981, #06b6d4);
 }
 
 .gradient-text--gradient-berry {
-  background: linear-gradient(135deg, #a855f7, #ec4899);
+  background-image: linear-gradient(135deg, #a855f7, #ec4899);
+}
+
+/* Highlight: same tokens as the text-fill classes above, used as a solid
+   background behind legible (non-transparent) text instead of a clip. */
+.gradient-highlight {
+  color: #ffffff;
+  padding: 0 0.15em;
+}
+
+.gradient-highlight--highlight-sunset {
+  background-image: linear-gradient(135deg, #f97316, #ec4899);
+}
+
+.gradient-highlight--highlight-ocean {
+  background-image: linear-gradient(135deg, #0ea5e9, #6366f1);
+}
+
+.gradient-highlight--highlight-mint {
+  background-image: linear-gradient(135deg, #10b981, #06b6d4);
+}
+
+.gradient-highlight--highlight-berry {
+  background-image: linear-gradient(135deg, #a855f7, #ec4899);
 }

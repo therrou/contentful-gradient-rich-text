@@ -32,6 +32,13 @@ describe('renderGradientRichText', () => {
     expect(span.className).toContain('gradient-text--gradient-ocean');
   });
 
+  it('wraps highlight-marked text in a span with the matching class, independent of any gradient mark', () => {
+    render(renderGradientRichText(docWithMark('highlight-ocean')));
+    const span = screen.getByText('Gradient Hello');
+    expect(span.tagName).toBe('SPAN');
+    expect(span.className).toContain('gradient-highlight--highlight-ocean');
+  });
+
   it('renders plain text without a gradient span when no gradient mark is present', () => {
     const doc = {
       nodeType: BLOCKS.DOCUMENT,

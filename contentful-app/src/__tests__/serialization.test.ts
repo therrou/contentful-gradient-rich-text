@@ -105,17 +105,17 @@ describe('serialization', () => {
     expect((second[0] as any).children[0].text).toBe('');
   });
 
-  it('preserves non-paragraph top-level blocks unchanged through slateValueToDocument', () => {
-    const heading = {
-      nodeType: BLOCKS.HEADING_1,
-      data: {},
-      content: [{ nodeType: 'text', value: 'Existing heading', marks: [], data: {} }],
+  it('preserves unsupported top-level blocks unchanged through slateValueToDocument', () => {
+    const embeddedEntry = {
+      nodeType: BLOCKS.EMBEDDED_ENTRY,
+      data: { target: { sys: { id: 'entry1', type: 'Link', linkType: 'Entry' } } },
+      content: [],
     };
     const doc: Document = {
       nodeType: BLOCKS.DOCUMENT,
       data: {},
       content: [
-        heading as any,
+        embeddedEntry as any,
         {
           nodeType: BLOCKS.PARAGRAPH,
           data: {},
@@ -128,12 +128,12 @@ describe('serialization', () => {
     const slateValue = documentToSlateValue(doc);
     expect(slateValue).toEqual([{ type: 'paragraph', children: [{ text: 'editable paragraph' }] }]);
 
-    // ...but the heading must not be lost on write-back when passed through.
+    // ...but the embedded entry must not be lost on write-back when passed through.
     const nonParagraphBlocks = getNonParagraphBlocks(doc);
-    expect(nonParagraphBlocks).toEqual([heading]);
+    expect(nonParagraphBlocks).toEqual([embeddedEntry]);
 
-    const written = slateValueToDocument(slateValue, nonParagraphBlocks);
-    expect(written.content).toContainEqual(heading);
+    const written = slateValueToDocument(slateValue, nonParagraphBlocks as any);
+    expect(written.content).toContainEqual(embeddedEntry);
     expect(written.content).toContainEqual({
       nodeType: BLOCKS.PARAGRAPH,
       data: {},
@@ -141,11 +141,103 @@ describe('serialization', () => {
     });
   });
 
-  describe('getBlockLayout / position-preserving write-back', () => {
-    const heading = {
-      nodeType: BLOCKS.HEADING_1,
+  it('converts headings, blockquotes, lists, and hr to their Slate element types', () => {
+    const doc: Document = {
+      nodeType: BLOCKS.DOCUMENT,
       data: {},
-      content: [{ nodeType: 'text', value: 'Existing heading', marks: [], data: {} }],
+      content: [
+        {
+          nodeType: BLOCKS.HEADING_1,
+          data: {},
+          content: [{ nodeType: 'text', value: 'Title', marks: [], data: {} }],
+        },
+        {
+          nodeType: BLOCKS.QUOTE,
+          data: {},
+          content: [
+            {
+              nodeType: BLOCKS.PARAGRAPH,
+              data: {},
+              content: [{ nodeType: 'text', value: 'quoted', marks: [], data: {} }],
+            },
+          ],
+        },
+        {
+          nodeType: BLOCKS.UL_LIST,
+          data: {},
+          content: [
+            {
+              nodeType: BLOCKS.LIST_ITEM,
+              data: {},
+              content: [
+                {
+                  nodeType: BLOCKS.PARAGRAPH,
+                  data: {},
+                  content: [{ nodeType: 'text', value: 'item one', marks: [], data: {} }],
+                },
+              ],
+            },
+          ],
+        },
+        { nodeType: BLOCKS.HR, data: {}, content: [] },
+      ] as any,
+    };
+
+    expect(documentToSlateValue(doc)).toEqual([
+      { type: 'heading-1', children: [{ text: 'Title' }] },
+      { type: 'blockquote', children: [{ type: 'paragraph', children: [{ text: 'quoted' }] }] },
+      {
+        type: 'unordered-list',
+        children: [
+          {
+            type: 'list-item',
+            children: [{ type: 'paragraph', children: [{ text: 'item one' }] }],
+          },
+        ],
+      },
+      { type: 'hr', children: [{ text: '' }] },
+    ]);
+  });
+
+  it('round-trips headings, blockquotes, lists, and hr through slateValueToDocument', () => {
+    const doc: Document = {
+      nodeType: BLOCKS.DOCUMENT,
+      data: {},
+      content: [
+        {
+          nodeType: BLOCKS.HEADING_2,
+          data: {},
+          content: [{ nodeType: 'text', value: 'Subtitle', marks: [], data: {} }],
+        },
+        {
+          nodeType: BLOCKS.OL_LIST,
+          data: {},
+          content: [
+            {
+              nodeType: BLOCKS.LIST_ITEM,
+              data: {},
+              content: [
+                {
+                  nodeType: BLOCKS.PARAGRAPH,
+                  data: {},
+                  content: [{ nodeType: 'text', value: 'first', marks: [], data: {} }],
+                },
+              ],
+            },
+          ],
+        },
+      ] as any,
+    };
+
+    const roundTripped = slateValueToDocument(documentToSlateValue(doc));
+    expect(roundTripped).toEqual(doc);
+  });
+
+  describe('getBlockLayout / position-preserving write-back', () => {
+    const embeddedEntry = {
+      nodeType: BLOCKS.EMBEDDED_ENTRY,
+      data: { target: { sys: { id: 'entry1', type: 'Link', linkType: 'Entry' } } },
+      content: [],
     };
     const paragraph = {
       nodeType: BLOCKS.PARAGRAPH,
@@ -153,42 +245,42 @@ describe('serialization', () => {
       content: [{ nodeType: 'text', value: 'editable paragraph', marks: [], data: {} }],
     };
 
-    it('preserves original order (heading before paragraph), not append-at-end', () => {
+    it('preserves original order (embedded entry before paragraph), not append-at-end', () => {
       const doc: Document = {
         nodeType: BLOCKS.DOCUMENT,
         data: {},
-        content: [heading as any, paragraph as any],
+        content: [embeddedEntry as any, paragraph as any],
       };
 
       const layout = getBlockLayout(doc);
-      expect(layout).toEqual([heading, 'paragraph']);
+      expect(layout).toEqual([embeddedEntry, 'editable']);
 
       const slateValue = documentToSlateValue(doc);
-      const written = slateValueToDocument(slateValue, layout);
+      const written = slateValueToDocument(slateValue, layout as any);
 
-      // Order-sensitive: heading must still come BEFORE the paragraph.
-      expect(written.content).toEqual([heading, paragraph]);
+      // Order-sensitive: embedded entry must still come BEFORE the paragraph.
+      expect(written.content).toEqual([embeddedEntry, paragraph]);
     });
 
     it('preserves order when the paragraph originally comes first', () => {
       const doc: Document = {
         nodeType: BLOCKS.DOCUMENT,
         data: {},
-        content: [paragraph as any, heading as any],
+        content: [paragraph as any, embeddedEntry as any],
       };
 
       const layout = getBlockLayout(doc);
       const slateValue = documentToSlateValue(doc);
-      const written = slateValueToDocument(slateValue, layout);
+      const written = slateValueToDocument(slateValue, layout as any);
 
-      expect(written.content).toEqual([paragraph, heading]);
+      expect(written.content).toEqual([paragraph, embeddedEntry]);
     });
 
-    it('inserts extra regenerated paragraphs right after the last paragraph slot', () => {
+    it('inserts extra regenerated paragraphs right after the last editable slot', () => {
       const doc: Document = {
         nodeType: BLOCKS.DOCUMENT,
         data: {},
-        content: [paragraph as any, heading as any],
+        content: [paragraph as any, embeddedEntry as any],
       };
 
       const layout = getBlockLayout(doc);
@@ -198,7 +290,7 @@ describe('serialization', () => {
       };
       const slateValue = [...documentToSlateValue(doc), extraParagraph] as any;
 
-      const written = slateValueToDocument(slateValue, layout);
+      const written = slateValueToDocument(slateValue, layout as any);
 
       expect(written.content).toEqual([
         paragraph,
@@ -207,24 +299,24 @@ describe('serialization', () => {
           data: {},
           content: [{ nodeType: 'text', value: 'newly added paragraph', marks: [], data: {} }],
         },
-        heading,
+        embeddedEntry,
       ]);
     });
 
-    it('omits unfilled paragraph slots when fewer paragraphs are regenerated', () => {
+    it('omits unfilled editable slots when fewer nodes are regenerated', () => {
       const doc: Document = {
         nodeType: BLOCKS.DOCUMENT,
         data: {},
-        content: [paragraph as any, heading as any, paragraph as any],
+        content: [paragraph as any, embeddedEntry as any, paragraph as any],
       };
 
       const layout = getBlockLayout(doc);
       // Only one paragraph left in the editor (as if the second was deleted).
       const slateValue = [{ type: 'paragraph', children: [{ text: 'editable paragraph' }] }] as any;
 
-      const written = slateValueToDocument(slateValue, layout);
+      const written = slateValueToDocument(slateValue, layout as any);
 
-      expect(written.content).toEqual([paragraph, heading]);
+      expect(written.content).toEqual([paragraph, embeddedEntry]);
     });
   });
 });

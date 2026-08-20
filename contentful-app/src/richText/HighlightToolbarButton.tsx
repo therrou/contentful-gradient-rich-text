@@ -2,19 +2,16 @@ import React, { useRef } from 'react';
 import { Editor, Transforms, type Range } from 'slate';
 import { ReactEditor } from 'slate-react';
 import { Menu, IconButton } from '@contentful/f36-components';
-import { GRADIENT_PRESETS } from '../gradientPresets';
-import { clearGradientMarks, toggleGradientMark } from './markToggle';
+import { HIGHLIGHT_PRESETS } from '../gradientPresets';
+import { clearHighlightMarks, toggleHighlightMark } from './markToggle';
 
-interface GradientToolbarButtonProps {
+interface HighlightToolbarButtonProps {
   editor: Editor;
 }
 
-export function GradientToolbarButton({ editor }: GradientToolbarButtonProps) {
-  // Opening the dropdown (a portal-rendered menu) moves focus away from the
-  // contentEditable, which collapses/clears editor.selection. Without
-  // capturing it beforehand, addMark/removeMark have nothing to apply to by
-  // the time a menu item is clicked — which is why toggling a gradient back
-  // off appeared to do nothing.
+export function HighlightToolbarButton({ editor }: HighlightToolbarButtonProps) {
+  // Same selection-loss issue as GradientToolbarButton: opening the portal
+  // menu moves focus off the contentEditable and clears editor.selection.
   const savedSelectionRef = useRef<Range | null>(null);
 
   return (
@@ -25,9 +22,9 @@ export function GradientToolbarButton({ editor }: GradientToolbarButtonProps) {
             isn't a forwardRef component, so that ref would silently drop. */}
         <IconButton
           variant="transparent"
-          aria-label="Gradient text"
-          title="Apply a gradient color to the selected text"
-          icon={<span aria-hidden>◈</span>}
+          aria-label="Highlight text"
+          title="Highlight the selected text with a color background"
+          icon={<span aria-hidden>▧</span>}
           onMouseDown={() => {
             savedSelectionRef.current = editor.selection;
           }}
@@ -40,12 +37,12 @@ export function GradientToolbarButton({ editor }: GradientToolbarButtonProps) {
               Transforms.select(editor, savedSelectionRef.current);
             }
             ReactEditor.focus(editor as unknown as ReactEditor);
-            clearGradientMarks(editor);
+            clearHighlightMarks(editor);
           }}
         >
-          No gradient
+          No highlight
         </Menu.Item>
-        {GRADIENT_PRESETS.map((preset) => (
+        {HIGHLIGHT_PRESETS.map((preset) => (
           <Menu.Item
             key={preset.markType}
             onClick={() => {
@@ -53,7 +50,7 @@ export function GradientToolbarButton({ editor }: GradientToolbarButtonProps) {
                 Transforms.select(editor, savedSelectionRef.current);
               }
               ReactEditor.focus(editor as unknown as ReactEditor);
-              toggleGradientMark(editor, preset.markType);
+              toggleHighlightMark(editor, preset.markType);
             }}
           >
             {preset.label}

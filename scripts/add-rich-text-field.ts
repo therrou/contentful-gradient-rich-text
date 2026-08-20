@@ -28,28 +28,69 @@ async function main() {
   const contentType = await client.contentType.get(params);
 
   const fieldId = 'richTextGradient';
-  const alreadyExists = contentType.fields.some((f) => f.id === fieldId);
 
-  if (alreadyExists) {
-    console.log(`Field "${fieldId}" already exists on content type "${CONTENTFUL_CONTENT_TYPE_ID}". Skipping.`);
-    return;
+  // Matches every mark/node type the GradientRichTextEditor can produce.
+  // Contentful's RichText field defaults to allowing only bold/italic/
+  // underline/code marks and a narrow set of node types when this
+  // validation is omitted, so it must be listed explicitly.
+  const richTextValidations = [
+    {
+      enabledMarks: [
+        'bold',
+        'italic',
+        'underline',
+        'code',
+        'gradient-sunset',
+        'gradient-ocean',
+        'gradient-mint',
+        'gradient-berry',
+        'gradient-animated',
+        'highlight-sunset',
+        'highlight-ocean',
+        'highlight-mint',
+        'highlight-berry',
+      ],
+    },
+    {
+      enabledNodeTypes: [
+        'heading-1',
+        'heading-2',
+        'heading-3',
+        'heading-4',
+        'heading-5',
+        'heading-6',
+        'blockquote',
+        'unordered-list',
+        'ordered-list',
+        'list-item',
+        'hr',
+        'paragraph',
+      ],
+    },
+  ];
+
+  const existingField = contentType.fields.find((f) => f.id === fieldId);
+
+  if (existingField) {
+    existingField.validations = richTextValidations;
+    console.log(`Field "${fieldId}" already exists on content type "${CONTENTFUL_CONTENT_TYPE_ID}". Updating its validations.`);
+  } else {
+    contentType.fields.push({
+      id: fieldId,
+      name: 'Rich Text (Gradient)',
+      type: 'RichText',
+      localized: false,
+      required: false,
+      disabled: false,
+      omitted: false,
+      validations: richTextValidations,
+    });
   }
-
-  contentType.fields.push({
-    id: fieldId,
-    name: 'Rich Text (Gradient)',
-    type: 'RichText',
-    localized: false,
-    required: false,
-    disabled: false,
-    omitted: false,
-    validations: [],
-  });
 
   const updated = await client.contentType.update(params, contentType);
   await client.contentType.publish(params, updated);
 
-  console.log(`Added and published field "${fieldId}" on content type "${CONTENTFUL_CONTENT_TYPE_ID}".`);
+  console.log(`Field "${fieldId}" is up to date and published on content type "${CONTENTFUL_CONTENT_TYPE_ID}".`);
 }
 
 main().catch((err) => {
