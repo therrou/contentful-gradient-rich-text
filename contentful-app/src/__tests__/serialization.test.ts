@@ -233,6 +233,63 @@ describe('serialization', () => {
     expect(roundTripped).toEqual(doc);
   });
 
+  it('converts a hyperlink node to a link element wrapping its text children', () => {
+    const doc: Document = {
+      nodeType: BLOCKS.DOCUMENT,
+      data: {},
+      content: [
+        {
+          nodeType: BLOCKS.PARAGRAPH,
+          data: {},
+          content: [
+            { nodeType: 'text', value: 'before ', marks: [], data: {} },
+            {
+              nodeType: 'hyperlink',
+              data: { uri: 'https://example.com' },
+              content: [{ nodeType: 'text', value: 'linked', marks: [{ type: 'bold' }], data: {} }],
+            },
+            { nodeType: 'text', value: ' after', marks: [], data: {} },
+          ],
+        },
+      ] as any,
+    };
+
+    expect(documentToSlateValue(doc)).toEqual([
+      {
+        type: 'paragraph',
+        children: [
+          { text: 'before ' },
+          { type: 'link', url: 'https://example.com', children: [{ text: 'linked', bold: true }] },
+          { text: ' after' },
+        ],
+      },
+    ]);
+  });
+
+  it('round-trips a paragraph containing a hyperlink', () => {
+    const doc: Document = {
+      nodeType: BLOCKS.DOCUMENT,
+      data: {},
+      content: [
+        {
+          nodeType: BLOCKS.PARAGRAPH,
+          data: {},
+          content: [
+            { nodeType: 'text', value: 'go to ', marks: [], data: {} },
+            {
+              nodeType: 'hyperlink',
+              data: { uri: 'https://example.com' },
+              content: [{ nodeType: 'text', value: 'example', marks: [], data: {} }],
+            },
+          ],
+        },
+      ] as any,
+    };
+
+    const roundTripped = slateValueToDocument(documentToSlateValue(doc));
+    expect(roundTripped).toEqual(doc);
+  });
+
   describe('getBlockLayout / position-preserving write-back', () => {
     const embeddedEntry = {
       nodeType: BLOCKS.EMBEDDED_ENTRY,

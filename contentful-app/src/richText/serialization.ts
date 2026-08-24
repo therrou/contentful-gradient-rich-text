@@ -1,5 +1,11 @@
-import type { Document, TopLevelBlock, Block, Text as ContentfulText } from '@contentful/rich-text-types';
-import { BLOCKS, MARKS } from '@contentful/rich-text-types';
+import type {
+  Document,
+  TopLevelBlock,
+  Block,
+  Inline,
+  Text as ContentfulText,
+} from '@contentful/rich-text-types';
+import { BLOCKS, INLINES, MARKS } from '@contentful/rich-text-types';
 import type { Descendant } from 'slate';
 import { GRADIENT_ANIMATED_MARK_TYPE, GRADIENT_PRESETS, HIGHLIGHT_PRESETS } from '../gradientPresets';
 
@@ -11,7 +17,15 @@ const emptyParagraph = (): Descendant[] => [
   { type: 'paragraph', children: [{ text: '' }] } as Descendant,
 ];
 
-const STANDARD_MARK_TYPES: string[] = [MARKS.BOLD, MARKS.ITALIC, MARKS.UNDERLINE, MARKS.CODE];
+const STANDARD_MARK_TYPES: string[] = [
+  MARKS.BOLD,
+  MARKS.ITALIC,
+  MARKS.UNDERLINE,
+  MARKS.CODE,
+  MARKS.STRIKETHROUGH,
+  MARKS.SUPERSCRIPT,
+  MARKS.SUBSCRIPT,
+];
 const GRADIENT_MARK_TYPES: string[] = GRADIENT_PRESETS.map((p) => p.markType);
 const HIGHLIGHT_MARK_TYPES: string[] = HIGHLIGHT_PRESETS.map((p) => p.markType);
 const ALL_LEAF_MARK_TYPES: string[] = [
@@ -82,6 +96,23 @@ function textNodeToLeaf(textNode: ContentfulText): Record<string, unknown> {
   return leaf;
 }
 
+// A block's `content` mixes Text nodes with inline elements (currently just
+// hyperlinks). Hyperlinks can't nest other inlines, so their own content is
+// always plain Text.
+function blockContentToSlate(content: (ContentfulText | Inline)[]): Descendant[] {
+  return content.map((node) => {
+    if (node.nodeType === INLINES.HYPERLINK) {
+      const inline = node as Inline;
+      return {
+        type: 'link',
+        url: String((inline.data as { uri?: string }).uri ?? ''),
+        children: (inline.content as ContentfulText[]).map(textNodeToLeaf),
+      } as unknown as Descendant;
+    }
+    return textNodeToLeaf(node as ContentfulText) as unknown as Descendant;
+  });
+}
+
 function blockToSlateNode(block: Block | TopLevelBlock): Descendant {
   const slateType = BLOCK_TO_SLATE[block.nodeType];
 
@@ -113,11 +144,11 @@ function blockToSlateNode(block: Block | TopLevelBlock): Descendant {
     } as unknown as Descendant;
   }
 
-  // paragraph / headings: leaf-bearing blocks
-  const textNodes = (block as Block).content as ContentfulText[];
+  // paragraph / headings: leaf-bearing blocks (may also contain hyperlinks)
+  const content = (block as Block).content as (ContentfulText | Inline)[];
   return {
     type: slateType,
-    children: textNodes.map(textNodeToLeaf),
+    children: blockContentToSlate(content),
   } as unknown as Descendant;
 }
 
@@ -135,17 +166,33 @@ export function documentToSlateValue(document: Document | undefined): Descendant
   return nodes.length > 0 ? nodes : emptyParagraph();
 }
 
+function leafToTextNode(leaf: Record<string, unknown>): ContentfulText {
+  const marks = ALL_LEAF_MARK_TYPES.filter((markType) => leaf[markType] === true).map((type) => ({
+    type,
+  }));
+  return {
+    nodeType: 'text',
+    value: String(leaf.text ?? ''),
+    marks,
+    data: {},
+  } as ContentfulText;
+}
+
 function leavesToTextNodes(children: Descendant[]): ContentfulText[] {
-  return (children as unknown as Record<string, unknown>[]).map((leaf) => {
-    const marks = ALL_LEAF_MARK_TYPES.filter((markType) => leaf[markType] === true).map(
-      (type) => ({ type })
-    );
-    return {
-      nodeType: 'text',
-      value: String(leaf.text ?? ''),
-      marks,
-      data: {},
-    } as ContentfulText;
+  return (children as unknown as Record<string, unknown>[]).map(leafToTextNode);
+}
+
+// A block's Slate `children` mix plain leaves with `link` inline elements.
+function blockChildrenToContentful(children: Descendant[]): (ContentfulText | Inline)[] {
+  return (children as unknown as Record<string, unknown>[]).map((child) => {
+    if (child.type === 'link') {
+      return {
+        nodeType: INLINES.HYPERLINK,
+        data: { uri: String(child.url ?? '') },
+        content: leavesToTextNodes(child.children as Descendant[]),
+      } as unknown as Inline;
+    }
+    return leafToTextNode(child);
   });
 }
 
@@ -184,7 +231,7 @@ function slateNodeToBlock(node: any): TopLevelBlock {
   return {
     nodeType,
     data: {},
-    content: leavesToTextNodes(node.children ?? []),
+    content: blockChildrenToContentful(node.children ?? []),
   } as unknown as TopLevelBlock;
 }
 

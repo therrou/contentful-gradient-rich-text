@@ -16,9 +16,21 @@ import {
   type RenderLeafProps,
   type RenderElementProps,
 } from 'slate-react';
-import { withHistory } from 'slate-history';
+import { withHistory, HistoryEditor } from 'slate-history';
 import type { FieldExtensionSDK } from '@contentful/app-sdk';
 import { IconButton, Menu, Tooltip } from '@contentful/f36-components';
+import {
+  ArrowUUpLeftIcon,
+  ArrowUUpRightIcon,
+  CaretDownIcon,
+  ListBulletsIcon,
+  ListNumbersIcon,
+  MinusIcon,
+  QuotesIcon,
+  TextBIcon,
+  TextItalicIcon,
+  TextUnderlineIcon,
+} from '@contentful/f36-icons';
 import {
   GRADIENT_ANIMATED_MARK_TYPE,
   isGradientMarkType,
@@ -29,6 +41,8 @@ import {
 import { GradientLeaf } from './GradientLeaf';
 import { GradientToolbarButton } from './GradientToolbarButton';
 import { HighlightToolbarButton } from './HighlightToolbarButton';
+import { HyperlinkButton } from './HyperlinkButton';
+import { MoreStylesDropdown } from './MoreStylesDropdown';
 import {
   documentToSlateValue,
   slateValueToDocument,
@@ -96,6 +110,15 @@ function insertHr(editor: Editor) {
 // visible indicator. Wrapping it in a span with conditional styling gives
 // toolbar buttons a highlighted state, matching what aria-pressed already
 // reports to assistive tech.
+function ToolbarDivider() {
+  return (
+    <span
+      aria-hidden
+      style={{ width: '1px', alignSelf: 'stretch', margin: '0 4px', backgroundColor: '#e5e5e5' }}
+    />
+  );
+}
+
 function ToolbarButtonWrapper({
   active,
   children,
@@ -176,6 +199,39 @@ function MarkButton({
   );
 }
 
+function UndoRedoButtons({ editor }: { editor: Editor }) {
+  const history = (editor as unknown as { history: { undos: unknown[]; redos: unknown[] } })
+    .history;
+  return (
+    <>
+      <Tooltip content="Undo" placement="top">
+        <IconButton
+          variant="transparent"
+          aria-label="Undo"
+          icon={<ArrowUUpLeftIcon />}
+          isDisabled={history.undos.length === 0}
+          onMouseDown={(e: React.MouseEvent) => {
+            e.preventDefault();
+            HistoryEditor.undo(editor as unknown as HistoryEditor);
+          }}
+        />
+      </Tooltip>
+      <Tooltip content="Redo" placement="top">
+        <IconButton
+          variant="transparent"
+          aria-label="Redo"
+          icon={<ArrowUUpRightIcon />}
+          isDisabled={history.redos.length === 0}
+          onMouseDown={(e: React.MouseEvent) => {
+            e.preventDefault();
+            HistoryEditor.redo(editor as unknown as HistoryEditor);
+          }}
+        />
+      </Tooltip>
+    </>
+  );
+}
+
 const HEADING_OPTIONS: { format: string; label: string }[] = [
   { format: 'paragraph', label: 'Paragraph' },
   { format: 'heading-1', label: 'Heading 1' },
@@ -208,7 +264,12 @@ function HeadingDropdown({ editor }: { editor: Editor }) {
           variant="transparent"
           aria-label="Text style"
           title="Text style — paragraph or heading level"
-          icon={<span>{currentHeadingLabel(editor)} ▾</span>}
+          icon={
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              {currentHeadingLabel(editor)}
+              <CaretDownIcon size="tiny" />
+            </span>
+          }
           onMouseDown={() => {
             savedSelectionRef.current = editor.selection;
           }}
@@ -243,9 +304,10 @@ function HeadingDropdown({ editor }: { editor: Editor }) {
 export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
   const editor = useMemo(() => {
     const base = withHistory(withReact(createEditor()));
-    const { isVoid, deleteBackward, normalizeNode } = base;
+    const { isVoid, isInline, deleteBackward, normalizeNode } = base;
 
     base.isVoid = (element) => (element as any).type === 'hr' || isVoid(element);
+    base.isInline = (element) => (element as any).type === 'link' || isInline(element);
 
     // Slate has no built-in notion of "list item" semantics: by default,
     // Backspace at the start of a list item just merges it into whatever
@@ -388,6 +450,9 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
     if (leafRecord.italic) node = <em>{node}</em>;
     if (leafRecord.underline) node = <u>{node}</u>;
     if (leafRecord.code) node = <code>{node}</code>;
+    if (leafRecord.strikethrough) node = <s>{node}</s>;
+    if (leafRecord.superscript) node = <sup>{node}</sup>;
+    if (leafRecord.subscript) node = <sub>{node}</sub>;
     if (gradientKey || highlightKey) {
       return (
         <GradientLeaf
@@ -463,6 +528,12 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
             {children}
           </div>
         );
+      case 'link':
+        return (
+          <a {...attributes} href={(element as any).url}>
+            {children}
+          </a>
+        );
       default:
         return <p {...attributes}>{children}</p>;
     }
@@ -474,6 +545,7 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
         style={{
           display: 'flex',
           flexWrap: 'wrap',
+          alignItems: 'center',
           gap: '4px',
           marginBottom: '8px',
           borderBottom: '1px solid #e5e5e5',
@@ -481,15 +553,51 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
         }}
       >
         <HeadingDropdown editor={editor} />
-        <MarkButton editor={editor} format="bold" label={<strong>B</strong>} tooltip="Bold" />
-        <MarkButton editor={editor} format="italic" label={<em>I</em>} tooltip="Italic" />
-        <MarkButton editor={editor} format="underline" label={<u>U</u>} tooltip="Underline" />
+        <ToolbarDivider />
+        <UndoRedoButtons editor={editor} />
+        <ToolbarDivider />
+        <MarkButton editor={editor} format="bold" label={<TextBIcon />} tooltip="Bold" />
+        <MarkButton editor={editor} format="italic" label={<TextItalicIcon />} tooltip="Italic" />
         <MarkButton
           editor={editor}
-          format="code"
-          label={<code>{'</>'}</code>}
-          tooltip="Inline code"
+          format="underline"
+          label={<TextUnderlineIcon />}
+          tooltip="Underline"
         />
+        <MoreStylesDropdown editor={editor} isMarkActive={isMarkActive} toggleMark={toggleMark} />
+        <ToolbarDivider />
+        <HyperlinkButton editor={editor} />
+        <ToolbarDivider />
+        <BlockButton
+          editor={editor}
+          format="unordered-list"
+          label={<ListBulletsIcon />}
+          tooltip="Bulleted list"
+        />
+        <BlockButton
+          editor={editor}
+          format="ordered-list"
+          label={<ListNumbersIcon />}
+          tooltip="Numbered list"
+        />
+        <BlockButton
+          editor={editor}
+          format="blockquote"
+          label={<QuotesIcon />}
+          tooltip="Blockquote"
+        />
+        <Tooltip content="Insert horizontal rule" placement="top">
+          <IconButton
+            variant="transparent"
+            aria-label="Insert horizontal rule"
+            icon={<MinusIcon />}
+            onMouseDown={(e: React.MouseEvent) => {
+              e.preventDefault();
+              insertHr(editor);
+            }}
+          />
+        </Tooltip>
+        <ToolbarDivider />
         <GradientToolbarButton editor={editor} />
         <MarkButton
           editor={editor}
@@ -498,35 +606,6 @@ export function GradientRichTextEditor({ sdk }: GradientRichTextEditorProps) {
           tooltip="Animate the selected gradient text"
         />
         <HighlightToolbarButton editor={editor} />
-        <BlockButton
-          editor={editor}
-          format="blockquote"
-          label={<span aria-hidden>“ ”</span>}
-          tooltip="Blockquote"
-        />
-        <BlockButton
-          editor={editor}
-          format="unordered-list"
-          label={<span aria-hidden>•—</span>}
-          tooltip="Bulleted list"
-        />
-        <BlockButton
-          editor={editor}
-          format="ordered-list"
-          label={<span aria-hidden>1.—</span>}
-          tooltip="Numbered list"
-        />
-        <Tooltip content="Insert horizontal rule" placement="top">
-          <IconButton
-            variant="transparent"
-            aria-label="Insert horizontal rule"
-            icon={<span aria-hidden>—</span>}
-            onMouseDown={(e: React.MouseEvent) => {
-              e.preventDefault();
-              insertHr(editor);
-            }}
-          />
-        </Tooltip>
       </div>
       {/* Slate-react's own `placeholder` prop drives a decoration built from
           Editor.end(editor, []), which throws once the document contains a
